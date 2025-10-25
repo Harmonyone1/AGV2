@@ -1,0 +1,134 @@
+# AGV2 Trading Costs Configuration
+# Defines realistic transaction costs for backtesting and live trading
+
+costs:
+  # Crypto Markets
+  ETH:
+    # Maker fees (limit orders that add liquidity)
+    maker_bps: 1.0  # 0.01% = 1 basis point
+    # Taker fees (market orders that remove liquidity)
+    taker_bps: 2.5  # 0.025%
+    # Slippage model
+    slippage:
+      model: "proportional"  # or "fixed", "impact"
+      base_bps: 0.5  # 0.005% base slippage
+      volatility_multiplier: 1.5  # scales with realized vol
+      size_impact: 0.0001  # per lot
+    # Bid-ask spread (average)
+    spread_bps: 1.0
+    # Financing costs (for held positions)
+    financing:
+      long_rate_annual: 0.05  # 5% APR
+      short_rate_annual: 0.05
+
+  # Metals
+  XAUUSD:
+    maker_bps: 0.0  # Typically no rebate
+    taker_bps: 2.0
+    slippage:
+      model: "proportional"
+      base_bps: 0.8
+      volatility_multiplier: 2.0
+      size_impact: 0.0002
+    spread_bps: 2.0  # Tighter during London/NY overlap
+    financing:
+      long_rate_annual: 0.03
+      short_rate_annual: 0.03
+
+  XAGUSD:
+    maker_bps: 0.0
+    taker_bps: 2.5
+    slippage:
+      model: "proportional"
+      base_bps: 1.0
+      volatility_multiplier: 2.5
+      size_impact: 0.0003
+    spread_bps: 3.0  # Wider than gold
+    financing:
+      long_rate_annual: 0.03
+      short_rate_annual: 0.03
+
+  # Indices
+  US30:
+    maker_bps: 0.0
+    taker_bps: 1.5
+    slippage:
+      model: "proportional"
+      base_bps: 1.5
+      volatility_multiplier: 2.0
+      size_impact: 0.0002
+    spread_bps: 2.5
+    financing:
+      long_rate_annual: 0.04
+      short_rate_annual: 0.04
+
+  NAS100:
+    maker_bps: 0.0
+    taker_bps: 1.5
+    slippage:
+      model: "proportional"
+      base_bps: 1.5
+      volatility_multiplier: 2.0
+      size_impact: 0.0002
+    spread_bps: 3.0  # More volatile
+    financing:
+      long_rate_annual: 0.04
+      short_rate_annual: 0.04
+
+  RUSSELL:
+    maker_bps: 0.0
+    taker_bps: 2.0
+    slippage:
+      model: "proportional"
+      base_bps: 2.0
+      volatility_multiplier: 2.5
+      size_impact: 0.0003
+    spread_bps: 4.0  # Less liquid
+    financing:
+      long_rate_annual: 0.04
+      short_rate_annual: 0.04
+
+# Backtesting assumptions
+backtesting:
+  # Execution assumptions
+  fill_ratio: 1.0  # 100% fill rate (conservative)
+  partial_fills: false  # Enable for more realism
+
+  # Latency simulation
+  latency_ms:
+    min: 10
+    max: 100
+    mean: 30
+    std: 20
+
+  # Cost perturbations (domain randomization)
+  randomization:
+    enabled: true
+    slippage_noise_std: 0.3  # 30% noise around base
+    spread_noise_std: 0.2    # 20% noise around base
+    commission_noise_std: 0.1  # 10% noise
+
+  # Worst-case stress testing
+  stress_scenarios:
+    high_vol:
+      slippage_multiplier: 3.0
+      spread_multiplier: 2.0
+    flash_crash:
+      slippage_multiplier: 10.0
+      spread_multiplier: 5.0
+      fill_ratio: 0.5
+
+# Live trading (production)
+live_trading:
+  # Use broker API for real-time spreads
+  use_live_spreads: true
+
+  # Conservative assumptions
+  safety_buffer:
+    slippage_multiplier: 1.5  # 50% buffer
+    min_spread_bps: 1.0  # Minimum spread assumption
+
+  # Execution preferences
+  order_type_preference: "limit"  # vs "market"
+  max_chase_ticks: 3  # How far to chase if limit not filled
+  timeout_seconds: 30  # Cancel if not filled

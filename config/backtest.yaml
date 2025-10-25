@@ -1,0 +1,16 @@
+environment:
+  data_path: data/features/encoder_windows_eth_small_emb.parquet
+  episode_length: 128
+  trading_cost_bps: 1.0
+  max_position: 1.0
+  reward:
+    trading_cost_bps: 1.0
+    holding_cost_bps: 0.2
+    risk_aversion: 0.001
+    reward_clip:
+    - -0.05
+    - 0.05
+evaluation:
+  episodes: 5
+  random_policy: false
+  model_path: models/policies/ppo_trading_env.zip

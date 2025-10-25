@@ -1,0 +1,195 @@
+# AGV2 Market Specifications
+# Defines trading parameters for each supported market
+
+markets:
+  # Crypto Markets (24/7, high frequency)
+  ETH:
+    name: "Ethereum"
+    category: crypto
+    exchange: "binance"  # or your preferred exchange
+    symbol_format: "ETHUSDT"
+    tick_size: 0.01
+    lot_size: 0.001
+    min_notional: 10.0
+    timeframes:
+      primary: "1m"
+      additional: ["5m", "15m", "1h"]
+    window_sizes:
+      fast: 128    # bars for short-term patterns
+      medium: 512  # bars for encoder input
+      slow: 2048   # bars for regime detection
+    session_config:
+      enabled: false  # 24/7 market
+    target_volatility: 0.02  # 2% daily vol target
+
+  # Precious Metals (23+ hours, session effects)
+  XAUUSD:
+    name: "Gold vs USD"
+    category: metals
+    exchange: "tradelocker"
+    symbol_format: "XAUUSD"
+    tick_size: 0.01
+    lot_size: 0.01
+    min_notional: 100.0
+    timeframes:
+      primary: "5m"
+      additional: ["15m", "1h", "4h"]
+    window_sizes:
+      fast: 64
+      medium: 512
+      slow: 2048
+    session_config:
+      enabled: true
+      sessions:
+        - name: "asia"
+          start: "00:00"
+          end: "09:00"
+          timezone: "UTC"
+        - name: "london"
+          start: "08:00"
+          end: "17:00"
+          timezone: "UTC"
+        - name: "newyork"
+          start: "13:00"
+          end: "22:00"
+          timezone: "UTC"
+    target_volatility: 0.015  # 1.5% daily vol target
+
+  XAGUSD:
+    name: "Silver vs USD"
+    category: metals
+    exchange: "tradelocker"
+    symbol_format: "XAGUSD"
+    tick_size: 0.001
+    lot_size: 0.01
+    min_notional: 100.0
+    timeframes:
+      primary: "5m"
+      additional: ["15m", "1h", "4h"]
+    window_sizes:
+      fast: 64
+      medium: 512
+      slow: 2048
+    session_config:
+      enabled: true
+      sessions:
+        - name: "asia"
+          start: "00:00"
+          end: "09:00"
+          timezone: "UTC"
+        - name: "london"
+          start: "08:00"
+          end: "17:00"
+          timezone: "UTC"
+        - name: "newyork"
+          start: "13:00"
+          end: "22:00"
+          timezone: "UTC"
+    target_volatility: 0.025  # 2.5% daily vol target
+
+  # US Indices (session gaps, volatility clusters)
+  US30:
+    name: "Dow Jones Industrial Average"
+    category: indices
+    exchange: "tradelocker"
+    symbol_format: "US30"
+    tick_size: 1.0
+    lot_size: 0.01
+    min_notional: 100.0
+    timeframes:
+      primary: "5m"
+      additional: ["15m", "1h", "4h"]
+    window_sizes:
+      fast: 64
+      medium: 512
+      slow: 2048
+    session_config:
+      enabled: true
+      sessions:
+        - name: "premarket"
+          start: "12:00"
+          end: "14:30"
+          timezone: "UTC"
+        - name: "regular"
+          start: "14:30"
+          end: "21:00"
+          timezone: "UTC"
+        - name: "afterhours"
+          start: "21:00"
+          end: "01:00"
+          timezone: "UTC"
+      gaps_expected: true
+    target_volatility: 0.012  # 1.2% daily vol target
+
+  NAS100:
+    name: "NASDAQ 100"
+    category: indices
+    exchange: "tradelocker"
+    symbol_format: "NAS100"
+    tick_size: 1.0
+    lot_size: 0.01
+    min_notional: 100.0
+    timeframes:
+      primary: "5m"
+      additional: ["15m", "1h", "4h"]
+    window_sizes:
+      fast: 64
+      medium: 512
+      slow: 2048
+    session_config:
+      enabled: true
+      sessions:
+        - name: "premarket"
+          start: "12:00"
+          end: "14:30"
+          timezone: "UTC"
+        - name: "regular"
+          start: "14:30"
+          end: "21:00"
+          timezone: "UTC"
+        - name: "afterhours"
+          start: "21:00"
+          end: "01:00"
+          timezone: "UTC"
+      gaps_expected: true
+    target_volatility: 0.015  # 1.5% daily vol target
+
+  RUSSELL:
+    name: "Russell 2000"
+    category: indices
+    exchange: "tradelocker"
+    symbol_format: "RUSSELL2000"
+    tick_size: 0.1
+    lot_size: 0.01
+    min_notional: 100.0
+    timeframes:
+      primary: "5m"
+      additional: ["15m", "1h", "4h"]
+    window_sizes:
+      fast: 64
+      medium: 512
+      slow: 2048
+    session_config:
+      enabled: true
+      sessions:
+        - name: "premarket"
+          start: "12:00"
+          end: "14:30"
+          timezone: "UTC"
+        - name: "regular"
+          start: "14:30"
+          end: "21:00"
+          timezone: "UTC"
+        - name: "afterhours"
+          start: "21:00"
+          end: "01:00"
+          timezone: "UTC"
+      gaps_expected: true
+    target_volatility: 0.018  # 1.8% daily vol target
+
+# Global settings
+global:
+  base_currency: "USD"
+  max_leverage: 20.0
+  margin_call_level: 0.50
+  stop_out_level: 0.30

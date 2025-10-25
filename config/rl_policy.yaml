@@ -1,0 +1,24 @@
+environment:
+  data_path: data/features/encoder_windows_eth_small_emb.parquet
+  episode_length: 128
+  trading_cost_bps: 1.0
+  max_position: 1.0
+  reward:
+    trading_cost_bps: 1.0
+    holding_cost_bps: 0.2
+    risk_aversion: 0.001
+    reward_clip:
+    - -0.05
+    - 0.05
+training:
+  total_timesteps: 5000
+  learning_rate: 0.0003
+  batch_size: 256
+  n_steps: 512
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.0
+  vf_coef: 0.5
+  seed: 42
+  checkpoint_dir: models/policies

@@ -1,0 +1,31 @@
+﻿# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# Editors / tooling
+.vscode/
+.idea/
+*.code-workspace
+
+# Local secrets
+.env
+.env.*
+*.secret
+
+# Artifacts + data
+.mlruns/
+mlruns/
+models/
+data/
+notebooks/.ipynb_checkpoints/
+logs/
+
+# pytest
+.pytest_cache/
+
