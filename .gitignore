@@ -21,9 +21,9 @@ ENV/
 # Artifacts + data
 .mlruns/
 mlruns/
-models/
+
 data/
-notebooks/.ipynb_checkpoints/
+
 logs/
 
 # pytest
