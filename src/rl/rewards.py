@@ -23,11 +23,15 @@ def compute_reward(
     price_return: float,
     realized_vol: float | None,
     cfg: RewardConfig,
+    trade_cost_bps: float | None = None,
+    holding_cost_bps: float | None = None,
 ) -> float:
     """Return reward for the current step given position dynamics."""
 
-    trade_cost = abs(position - prev_position) * cfg.trading_cost_bps * 1e-4
-    holding_cost = abs(position) * cfg.holding_cost_bps * 1e-4
+    trade_bps = cfg.trading_cost_bps if trade_cost_bps is None else trade_cost_bps
+    hold_bps = cfg.holding_cost_bps if holding_cost_bps is None else holding_cost_bps
+    trade_cost = abs(position - prev_position) * trade_bps * 1e-4
+    holding_cost = abs(position) * hold_bps * 1e-4
     risk_penalty = cfg.risk_aversion * (realized_vol if realized_vol is not None else abs(price_return))
     pnl = position * price_return
     reward = pnl - trade_cost - holding_cost - risk_penalty

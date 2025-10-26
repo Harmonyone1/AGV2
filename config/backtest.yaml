@@ -1,5 +1,26 @@
-environment:
+﻿environment:
+  symbol: ETH
   data_path: data/features/encoder_windows_eth_small_emb.parquet
+  market_config: config/markets.yaml
+  cost_config: config/costs.yaml
+  execution_profile: backtesting
+  order_types:
+    - market
+    - limit
+  limit_order_fill_bps: 5.0
+  limit_offset_bps:
+    - 5.0
+    - 10.0
+  bracket_take_profit_bps:
+    - 15.0
+  bracket_stop_loss_bps:
+    - 10.0
+  position_sizes:
+    - -1.0
+    - -0.5
+    - 0.0
+    - 0.5
+    - 1.0
   episode_length: 128
   trading_cost_bps: 1.0
   max_position: 1.0
@@ -8,8 +29,8 @@ environment:
     holding_cost_bps: 0.2
     risk_aversion: 0.001
     reward_clip:
-    - -0.05
-    - 0.05
+      - -0.05
+      - 0.05
 evaluation:
   episodes: 5
   random_policy: false

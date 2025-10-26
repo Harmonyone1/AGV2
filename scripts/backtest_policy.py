@@ -2,14 +2,12 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
-import numpy as np
 import yaml
 
 from backtest import VectorizedBacktester
-from rl import ObservationStatsWrapper, RewardConfig, TradingEnv
+from rl import RewardConfig, TradingEnv
 
 try:  # Optional dependency for loading PPO checkpoints
     from stable_baselines3 import PPO
@@ -23,7 +21,29 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--model", default=None, help="Path to SB3 checkpoint (overrides config)")
     parser.add_argument("--episodes", type=int, default=None, help="Number of evaluation episodes")
     parser.add_argument("--random", action="store_true", help="Use random policy instead of loading a checkpoint")
+    parser.add_argument("--symbol", default=None, help="Override symbol defined in config")
     return parser.parse_args()
+
+
+def build_env_kwargs(env_cfg: Dict[str, Any], reward_cfg: RewardConfig, data_path: str, symbol_override: str | None):
+    symbol = symbol_override or env_cfg.get("symbol")
+    return dict(
+        data=data_path,
+        symbol=symbol,
+        episode_length=int(env_cfg.get("episode_length", 256)),
+        trading_cost_bps=float(env_cfg.get("trading_cost_bps", reward_cfg.trading_cost_bps)),
+        max_position=float(env_cfg.get("max_position", 1.0)),
+        reward_cfg=reward_cfg,
+        market_config_path=env_cfg.get("market_config", "config/markets.yaml"),
+        cost_config_path=env_cfg.get("cost_config", "config/costs.yaml"),
+        execution_profile=env_cfg.get("execution_profile", "backtesting"),
+        order_types=env_cfg.get("order_types"),
+        limit_order_fill_bps=float(env_cfg.get("limit_order_fill_bps", 5.0)),
+        limit_offset_bps=env_cfg.get("limit_offset_bps"),
+        bracket_take_profit_bps=env_cfg.get("bracket_take_profit_bps"),
+        bracket_stop_loss_bps=env_cfg.get("bracket_stop_loss_bps"),
+        position_sizes=env_cfg.get("position_sizes"),
+    )
 
 
 def main() -> None:
@@ -36,13 +56,8 @@ def main() -> None:
     if not data_path:
         raise ValueError("environment.data_path must be provided")
     reward_cfg = RewardConfig(**(env_cfg.get("reward", {})))
-    env = TradingEnv(
-        data=data_path,
-        episode_length=int(env_cfg.get("episode_length", 256)),
-        trading_cost_bps=float(env_cfg.get("trading_cost_bps", reward_cfg.trading_cost_bps)),
-        max_position=float(env_cfg.get("max_position", 1.0)),
-        reward_cfg=reward_cfg,
-    )
+    env_kwargs = build_env_kwargs(env_cfg, reward_cfg, data_path, args.symbol)
+    env = TradingEnv(**env_kwargs)
 
     episodes = args.episodes or int(eval_cfg.get("episodes", 5))
     model_path = args.model or eval_cfg.get("model_path")

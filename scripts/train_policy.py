@@ -1,4 +1,4 @@
-"""Stage-2 PPO training script."""
+﻿"""Stage-2 PPO training script."""
 from __future__ import annotations
 
 import argparse
@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 import yaml
+import torch
 
 from rl import ObservationStatsWrapper, RewardConfig, TradingEnv
 
@@ -26,7 +27,30 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--data", default=None, help="Override data path")
     parser.add_argument("--timesteps", type=int, default=None, help="Override total timesteps")
     parser.add_argument("--output", default=None, help="Override checkpoint directory")
+    parser.add_argument("--symbol", default=None, help="Override symbol (uses config by default)")
+    parser.add_argument("--device", default=None, help="torch device for PPO (cuda/cpu/auto)")
     return parser.parse_args()
+
+
+def build_env_kwargs(env_cfg: Dict[str, Any], reward_cfg: RewardConfig, data_path: str, symbol_override: str | None):
+    symbol = symbol_override or env_cfg.get("symbol")
+    return dict(
+        data=data_path,
+        symbol=symbol,
+        episode_length=int(env_cfg.get("episode_length", 256)),
+        trading_cost_bps=float(env_cfg.get("trading_cost_bps", reward_cfg.trading_cost_bps)),
+        max_position=float(env_cfg.get("max_position", 1.0)),
+        reward_cfg=reward_cfg,
+        market_config_path=env_cfg.get("market_config", "config/markets.yaml"),
+        cost_config_path=env_cfg.get("cost_config", "config/costs.yaml"),
+        execution_profile=env_cfg.get("execution_profile", "backtesting"),
+        order_types=env_cfg.get("order_types"),
+        limit_order_fill_bps=float(env_cfg.get("limit_order_fill_bps", 5.0)),
+        limit_offset_bps=env_cfg.get("limit_offset_bps"),
+        bracket_take_profit_bps=env_cfg.get("bracket_take_profit_bps"),
+        bracket_stop_loss_bps=env_cfg.get("bracket_stop_loss_bps"),
+        position_sizes=env_cfg.get("position_sizes"),
+    )
 
 
 def main() -> None:
@@ -44,22 +68,11 @@ def main() -> None:
         raise ValueError("Data path must be provided via --data or config file")
 
     reward_cfg = RewardConfig(**env_cfg.get("reward", {}))
-    env = TradingEnv(
-        data=data_path,
-        episode_length=int(env_cfg.get("episode_length", 256)),
-        trading_cost_bps=float(env_cfg.get("trading_cost_bps", reward_cfg.trading_cost_bps)),
-        max_position=float(env_cfg.get("max_position", 1.0)),
-        reward_cfg=reward_cfg,
-    )
+    env_kwargs = build_env_kwargs(env_cfg, reward_cfg, data_path, args.symbol)
+    env = TradingEnv(**env_kwargs)
 
     def _make_env():
-        return ObservationStatsWrapper(TradingEnv(
-            data=data_path,
-            episode_length=env.episode_length,
-            trading_cost_bps=env.trading_cost_bps,
-            max_position=env.max_position,
-            reward_cfg=reward_cfg,
-        ))
+        return ObservationStatsWrapper(TradingEnv(**env_kwargs))
 
     vec_env = DummyVecEnv([_make_env])
 
@@ -68,6 +81,7 @@ def main() -> None:
     output_dir = Path(args.output or train_cfg.get("checkpoint_dir", "models/policies"))
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    device = args.device or env_cfg.get("device") or ("cuda" if torch.cuda.is_available() else "auto")
     ppo_kwargs = {
         "learning_rate": float(train_cfg.get("learning_rate", 3e-4)),
         "batch_size": int(train_cfg.get("batch_size", 512)),
@@ -78,6 +92,7 @@ def main() -> None:
         "ent_coef": float(train_cfg.get("ent_coef", 0.0)),
         "vf_coef": float(train_cfg.get("vf_coef", 0.5)),
         "seed": int(train_cfg.get("seed", 42)),
+        "device": device,
     }
 
     model = PPO("MlpPolicy", vec_env, verbose=1, **ppo_kwargs)
@@ -94,3 +109,7 @@ def _load_yaml(path: str) -> Dict[str, Any]:
 
 if __name__ == "__main__":
     main()
+
+
+
+
