@@ -1,0 +1,32 @@
+# Walk-Forward Validation Configuration
+
+# Time window settings
+train_duration_days: 90  # 3 months for training
+test_duration_days: 30   # 1 month for testing
+step_days: 30            # Roll forward by 1 month
+
+# Data settings
+data_path: data/features/encoder_windows_eth.parquet
+min_train_samples: 100
+min_test_samples: 10
+
+# Encoder training (reduced for walk-forward speed)
+encoder:
+  num_epochs: 5  # Fewer epochs per window
+  early_stopping:
+    enabled: false  # Disabled for speed
+
+# Policy training (reduced for walk-forward speed)
+policy:
+  total_timesteps: 50000  # Reduced from 500K for faster iterations
+  learning_rate: 0.0003
+
+# Output
+output_dir: results/walk_forward
+save_checkpoints: true  # Save encoder/policy per window
+save_plots: true        # Generate performance plots
+
+# MLflow tracking
+logging:
+  use_mlflow: false
+  experiment_name: agv2_walk_forward_validation

@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(tree:*)",
+      "Bash(python -m pytest:*)",
+      "Bash(where:*)",
+      "Bash(C:UsersDavidPorterminiconda3python.exe -m pytest:*)",
+      "Bash(echo:*)",
+      "Bash(pytest:*)",
+      "Bash(python scripts/backtest_policy.py:*)",
+      "Bash(C:/Users/DavidPorter/miniconda3/python.exe scripts/backtest_policy.py --config config/backtest.yaml --random --episodes 3)",
+      "Bash(PYTHONPATH=D:/AGV2/src C:/Users/DavidPorter/miniconda3/python.exe:*)",
+      "Bash(C:/Users/DavidPorter/miniconda3/python.exe:*)",
+      "Bash(set:*)",
+      "Bash(timeout /t 3)",
+      "Bash(curl:*)",
+      "Bash(node --version:*)",
+      "Bash(npm --version:*)",
+      "Bash(npm create:*)",
+      "Bash(npm install)",
+      "Bash(npm install:*)",
+      "Bash(npx tailwindcss:*)",
+      "Bash(npm run dev:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

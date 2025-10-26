@@ -21,9 +21,10 @@
     - 0.0
     - 0.5
     - 1.0
-  episode_length: 128
+  episode_length: 256  # Increased from 128 for better long-term learning
   trading_cost_bps: 1.0
   max_position: 1.0
+  include_position_in_obs: true  # Enable position state in observations
   reward:
     trading_cost_bps: 1.0
     holding_cost_bps: 0.2
@@ -31,15 +32,17 @@
     reward_clip:
       - -0.05
       - 0.05
+    normalize_pnl: true  # Enable log(1 + pnl/equity) normalization
+    initial_equity: 10000.0
 training:
-  total_timesteps: 5000
+  total_timesteps: 500000  # Increased from 5000 for production training
   learning_rate: 0.0003
-  batch_size: 256
-  n_steps: 512
+  batch_size: 512  # Increased from 256 for more stable gradients
+  n_steps: 2048  # Increased from 512 for better value estimates
   gamma: 0.99
   gae_lambda: 0.95
   clip_range: 0.2
-  ent_coef: 0.0
+  ent_coef: 0.01  # Added entropy bonus to encourage exploration
   vf_coef: 0.5
   seed: 42
   checkpoint_dir: models/policies

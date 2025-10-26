@@ -20,6 +20,11 @@ except Exception as exc:  # pragma: no cover
 else:
     _IMPORT_ERROR = None
 
+try:
+    import mlflow  # type: ignore
+except Exception:  # pragma: no cover
+    mlflow = None  # type: ignore
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train PPO trading policy")
@@ -50,6 +55,7 @@ def build_env_kwargs(env_cfg: Dict[str, Any], reward_cfg: RewardConfig, data_pat
         bracket_take_profit_bps=env_cfg.get("bracket_take_profit_bps"),
         bracket_stop_loss_bps=env_cfg.get("bracket_stop_loss_bps"),
         position_sizes=env_cfg.get("position_sizes"),
+        include_position_in_obs=bool(env_cfg.get("include_position_in_obs", True)),
     )
 
 
@@ -95,11 +101,37 @@ def main() -> None:
         "device": device,
     }
 
+    # Initialize MLflow tracking if enabled
+    use_mlflow = mlflow is not None and cfg.get("logging", {}).get("use_mlflow", False)
+    if use_mlflow:
+        experiment_name = cfg.get("logging", {}).get("experiment_name", "agv2_policy_training")
+        mlflow.set_experiment(experiment_name)
+        mlflow.start_run()
+        # Log hyperparameters
+        mlflow.log_params({
+            "symbol": env.symbol,
+            "episode_length": env.episode_length,
+            "max_position": env.max_position,
+            "total_timesteps": total_steps,
+            **ppo_kwargs,
+        })
+
     model = PPO("MlpPolicy", vec_env, verbose=1, **ppo_kwargs)
     model.learn(total_timesteps=total_steps)
-    checkpoint = output_dir / "ppo_trading_env"
+
+    if use_mlflow:
+        mlflow.end_run()
+
+    # Save checkpoint with timestamp for versioning
+    from datetime import datetime
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    checkpoint = output_dir / f"ppo_trading_env_{timestamp}"
     model.save(checkpoint)
     print(f"Saved policy checkpoint to {checkpoint}")
+    # Also save as latest for convenience
+    latest = output_dir / "ppo_trading_env"
+    model.save(latest)
+    print(f"Saved latest checkpoint to {latest}")
 
 
 def _load_yaml(path: str) -> Dict[str, Any]:

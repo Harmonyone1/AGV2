@@ -74,7 +74,12 @@ def load_market_spec(symbol: str, path: str = "config/markets.yaml") -> MarketSp
     data = _cached_markets(str(Path(path).resolve()))
     markets = data.get("markets", {})
     if symbol not in markets:
-        raise KeyError(f"Market spec not found for symbol '{symbol}' in {path}")
+        available = sorted(markets.keys())
+        available_str = ", ".join(available) if available else "none"
+        raise KeyError(
+            f"Market spec not found for symbol '{symbol}' in {path}.\n"
+            f"Available symbols: {available_str}"
+        )
     entry = markets[symbol]
     return MarketSpec(
         symbol=symbol,
@@ -94,7 +99,12 @@ def load_cost_spec(
     data = _cached_costs(str(Path(path).resolve()))
     symbol_costs = data.get("costs", {})
     if symbol not in symbol_costs:
-        raise KeyError(f"Cost spec not found for symbol '{symbol}' in {path}")
+        available = sorted(symbol_costs.keys())
+        available_str = ", ".join(available) if available else "none"
+        raise KeyError(
+            f"Cost spec not found for symbol '{symbol}' in {path}.\n"
+            f"Available symbols: {available_str}"
+        )
     entry = symbol_costs[symbol]
     slippage_entry = entry.get("slippage", {})
     slippage = SlippageSpec(

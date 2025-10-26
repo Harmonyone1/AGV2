@@ -2,6 +2,7 @@
 """Gymnasium-compatible trading environment with TradeLocker-style execution."""
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime, time, timezone
 from pathlib import Path
@@ -17,6 +18,7 @@ from rl.market_config import BacktestSettings, CostSpec, load_cost_spec, load_ma
 from rl.rewards import RewardConfig, compute_reward
 
 SessionRule = Tuple[time, time, ZoneInfo]
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -27,6 +29,7 @@ class EnvConfig:
     trading_cost_bps: float = 1.0
     max_position: float = 1.0
     reward: RewardConfig = field(default_factory=RewardConfig)
+    include_position_in_obs: bool = True  # Include position state in observations
 
 
 class TradingEnv(gym.Env):
@@ -52,8 +55,11 @@ class TradingEnv(gym.Env):
         bracket_take_profit_bps: Sequence[float] | None = None,
         bracket_stop_loss_bps: Sequence[float] | None = None,
         position_sizes: Sequence[float] | None = None,
+        include_position_in_obs: bool = True,
+        enable_logging: bool = False,
     ) -> None:
         super().__init__()
+        self.enable_logging = enable_logging
         self.frame = self._load_frame(data)
         if "features" not in self.frame.columns or "close" not in self.frame.columns:
             raise ValueError("Dataset must contain 'features' and 'close' columns")
@@ -64,6 +70,13 @@ class TradingEnv(gym.Env):
         self.feature_source = vector_column
         self.prices = self.frame["close"].to_numpy()
         self.timestamps = self.frame.get_column("timestamp").to_list() if "timestamp" in self.frame.columns else None
+
+        # Check for pre-computed volatility (use default window 30)
+        self.precomputed_vol = None
+        if "realized_vol_30" in self.frame.columns:
+            self.precomputed_vol = self.frame["realized_vol_30"].to_numpy()
+        elif "parkinson_vol_30" in self.frame.columns:
+            self.precomputed_vol = self.frame["parkinson_vol_30"].to_numpy()
 
         self.symbol = symbol or self._infer_symbol()
         self.market_spec = None
@@ -87,6 +100,7 @@ class TradingEnv(gym.Env):
         self.trading_cost_bps = trading_cost_bps
         self.max_position = max_position
         self.execution_profile = execution_profile
+        self.include_position_in_obs = include_position_in_obs
 
         self.order_types = tuple(order_types or ["market"])
         self.limit_order_fill_bps = float(limit_order_fill_bps)
@@ -104,7 +118,9 @@ class TradingEnv(gym.Env):
 
         self.action_space = spaces.Discrete(len(self._action_map))
         feature_dim = self.features.shape[1]
-        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(feature_dim,), dtype=np.float32)
+        # Add position state dimensions if enabled: [position, equity, steps_in_position]
+        obs_dim = feature_dim + 3 if self.include_position_in_obs else feature_dim
+        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32)
 
         self._np_random, _ = gym.utils.seeding.np_random()
         self._cost_noise: Dict[str, float] = {"spread": 1.0, "slippage": 1.0, "commission": 1.0}
@@ -143,8 +159,21 @@ class TradingEnv(gym.Env):
         self.prev_price = 0.0
         self.equity = 0.0
         self.step_count = 0
+        self.steps_in_position = 0
         self._terminated = False
         self._refresh_cost_noise()
+
+    def _build_observation(self, feature_vec: np.ndarray) -> np.ndarray:
+        """Augment feature vector with position state if enabled."""
+        if not self.include_position_in_obs:
+            return feature_vec
+        # Append [position, equity, steps_in_position]
+        position_state = np.array([
+            self.position / max(self.max_position, 1e-6),  # Normalized position
+            self.equity / max(self.reward_cfg.initial_equity, 1e-6),  # Normalized equity
+            self.steps_in_position / max(self.episode_length, 1.0),  # Normalized time in position
+        ], dtype=np.float32)
+        return np.concatenate([feature_vec, position_state])
 
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None):  # type: ignore[override]
         if seed is not None:
@@ -158,7 +187,20 @@ class TradingEnv(gym.Env):
             self.start_idx = int(self._np_random.integers(1, max_start)) if max_start > 2 else 1
         self.ptr = self.start_idx
         self.prev_price = float(self.prices[self.ptr - 1])
-        observation = self.features[self.ptr]
+        observation = self._build_observation(self.features[self.ptr])
+
+        if self.enable_logging:
+            logger.info(
+                "episode_start",
+                extra={
+                    "start_idx": self.start_idx,
+                    "episode_length": self.episode_length,
+                    "timestamp": self._timestamp(self.ptr),
+                    "symbol": self.symbol,
+                    "initial_price": float(self.prices[self.ptr]),
+                },
+            )
+
         info = {
             "position": self.position,
             "timestamp": self._timestamp(self.ptr),
@@ -204,21 +246,73 @@ class TradingEnv(gym.Env):
             cfg=self.reward_cfg,
             trade_cost_bps=trade_cost_bps,
             holding_cost_bps=holding_cost_bps,
+            equity=self.equity if self.equity != 0.0 else self.reward_cfg.initial_equity,
         )
         if bracket_trigger:
             new_position = 0.0
+            if self.enable_logging:
+                logger.info(
+                    "bracket_triggered",
+                    extra={
+                        "trigger_type": bracket_trigger,
+                        "position_before": self.position,
+                        "price_return": price_return,
+                        "equity": self.equity,
+                    },
+                )
+
+        # Track position changes for logging
+        position_changed = abs(new_position - self.position) > 1e-6
+
+        # Track steps in position
+        if abs(new_position) > 1e-9:
+            self.steps_in_position += 1
+        else:
+            self.steps_in_position = 0
+
         self.position = new_position
         self.equity += reward
         self.prev_price = price
         self.ptr += 1
         self.step_count += 1
 
+        # Log position changes
+        if self.enable_logging and position_changed:
+            logger.info(
+                "position_change",
+                extra={
+                    "step": self.step_count,
+                    "timestamp": self._timestamp(self.ptr),
+                    "price": price,
+                    "new_position": new_position,
+                    "position_delta": filled_delta,
+                    "order_type": order_type,
+                    "limit_status": limit_status,
+                    "trade_cost_bps": trade_cost_bps,
+                    "reward": reward,
+                    "equity": self.equity,
+                    "symbol": self.symbol,
+                },
+            )
+
         dataset_limit = len(self.prices) - 1
         episode_limit = self.start_idx + self.episode_length
         terminated = self.ptr >= min(dataset_limit, episode_limit)
         self._terminated = terminated
+
+        if self.enable_logging and terminated:
+            logger.info(
+                "episode_end",
+                extra={
+                    "final_equity": self.equity,
+                    "total_steps": self.step_count,
+                    "final_position": self.position,
+                    "timestamp": self._timestamp(min(self.ptr, len(self.prices) - 1)),
+                },
+            )
+
         obs_index = min(self.ptr, len(self.features) - 1)
-        observation = self.features[obs_index]
+        observation = self._build_observation(self.features[obs_index])
         info = {
             "position": self.position,
             "timestamp": self._timestamp(obs_index),
@@ -360,6 +454,14 @@ class TradingEnv(gym.Env):
         return (rate / self._steps_per_year) * 1e4
 
     def _estimate_realized_vol(self, idx: int, window: int = 30) -> float:
+        """Estimate realized volatility. Uses pre-computed if available for performance."""
+        # Use pre-computed volatility if available (much faster!)
+        if self.precomputed_vol is not None and idx < len(self.precomputed_vol):
+            vol = self.precomputed_vol[idx]
+            if not np.isnan(vol):
+                return float(vol)
+
+        # Fallback to runtime calculation
         if idx <= 0:
             return 0.0
         start = max(0, idx - window)

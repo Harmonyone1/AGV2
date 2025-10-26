@@ -107,8 +107,10 @@ def test_trading_env_prefers_embeddings(tmp_path):
     env = TradingEnv(data=data_path, episode_length=5)
     obs, _ = env.reset(seed=1)
     assert env.feature_source == "embedding"
-    assert env.observation_space.shape == (4,)
-    assert np.array_equal(obs, env.features[env.ptr])
+    # Observation space includes embedding (4-dim) + position state (3-dim) = 7-dim
+    assert env.observation_space.shape == (7,)
+    # First 4 dims should match the embedding features
+    assert np.array_equal(obs[:4], env.features[env.ptr])
 
 
 def test_trading_env_tradelocker_costs(tmp_path):

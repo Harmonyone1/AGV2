@@ -43,6 +43,7 @@ def build_env_kwargs(env_cfg: Dict[str, Any], reward_cfg: RewardConfig, data_pat
         bracket_take_profit_bps=env_cfg.get("bracket_take_profit_bps"),
         bracket_stop_loss_bps=env_cfg.get("bracket_stop_loss_bps"),
         position_sizes=env_cfg.get("position_sizes"),
+        include_position_in_obs=bool(env_cfg.get("include_position_in_obs", True)),
     )
 
 
@@ -74,12 +75,18 @@ def main() -> None:
         policy = PPO.load(model_path)
 
     positions, returns = _rollout(env, policy, episodes)
-    bt = VectorizedBacktester(returns, trading_cost_bps=env.trading_cost_bps)
+
+    # Determine annualization factor based on symbol type
+    # Crypto (24/7): 365 days, Metals/Indices: 252 days
+    annualization = 365.0 if env.symbol in ["ETH", "BTC", "SOL"] else 252.0
+
+    bt = VectorizedBacktester(returns, trading_cost_bps=env.trading_cost_bps, annualization_factor=annualization)
     result = bt.run(positions)
     print("Backtest results:")
+    print(f"  Symbol        : {env.symbol}")
     print(f"  Episodes      : {episodes}")
     print(f"  Total return  : {result.total_return:.4f}")
-    print(f"  Sharpe        : {result.sharpe:.3f}")
+    print(f"  Sharpe        : {result.sharpe:.3f} (annualized with factor {annualization:.0f})")
     print(f"  Max drawdown  : {result.max_drawdown:.4f}")
 
 
